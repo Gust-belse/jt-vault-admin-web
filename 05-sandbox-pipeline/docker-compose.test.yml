@@ -1,0 +1,17 @@
+services:
+  vault-postgres-test:
+    image: postgres:16-alpine
+    container_name: kpi_dpgs_vault_test_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_sandbox_only
+      POSTGRES_DB: vault_sandbox
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vault_sandbox"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
