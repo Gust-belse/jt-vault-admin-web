@@ -1,0 +1,34 @@
+name: Vault Security & Integration CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify-vault-system:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Start PostgreSQL 16 Sandbox
+        run: docker compose -f 05-sandbox-pipeline/docker-compose.test.yml up -d
+
+      - name: Run Full 4-Stage Verification Pipeline
+        run: python3 05-sandbox-pipeline/run_executor_and_integration.py --stage all
+
+      - name: Teardown Sandbox
+        if: always()
+        run: docker compose -f 05-sandbox-pipeline/docker-compose.test.yml down -v

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>J&amp;T Express — Kho Bảo Mật Tài Khoản &amp; Bí Mật (Admin AAL2)</title>
+  <meta name="description" content="Cổng quản trị Kho Bảo Mật Tài Khoản và Bí Mật tập trung (Supabase Vault · Write-Only · Admin MFA AAL2) cho J&amp;T Express." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f1f5f9; color: #0f172a; }
+    .font-mono-num { font-family: 'JetBrains Mono', monospace; }
+    .vault-tab.active { background: #e11d48; color: #ffffff; border-color: #e11d48; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- TOAST THÔNG BÁO -->
+  <div id="toastBox" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md"></div>
+
+  <!-- ====================================================================== -->
+  <!-- CỔNG XÁC THỰC 4 LỚP (KHÔNG CÓ TỰ ĐĂNG KÝ CÔNG KHAI)                    -->
+  <!-- ====================================================================== -->
+  <section id="gateScreen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-rose-950">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="bg-slate-950 text-white px-6 py-5 border-b border-rose-600/40 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center font-extrabold text-lg">🛡️</div>
+        <div class="flex-1 min-w-0">
+          <h1 class="text-base font-extrabold tracking-tight">Kho Bảo Mật Tài Khoản &amp; Bí Mật</h1>
+          <p class="text-[11px] text-slate-400">J&amp;T Express · Chỉ dành cho Admin đã xác thực MFA (AAL2)</p>
+        </div>
+        <a href="../index.html" title="Về trang chủ hệ thống" class="text-[11px] font-bold text-slate-400 hover:text-white transition whitespace-nowrap">← Trang chủ</a>
+      </div>
+
+      <!-- Chưa cấu hình Supabase -->
+      <div id="unconfiguredBox" class="hidden p-6 space-y-4">
+        <div class="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs space-y-1.5">
+          <div class="font-extrabold text-sm">Chưa cấu hình kết nối Supabase Cloud</div>
+          <p>Bạn có thể điền cố định trong tệp <code>02-vault-admin-ui/js/config.js</code> hoặc kết nối nhanh ngay bên dưới bằng <strong>Public URL</strong> và <strong>Public Anon Key</strong> của Supabase Project.</p>
+        </div>
+        <form id="runtimeConfigForm" class="space-y-3 text-xs">
+          <div>
+            <label for="cfgSupabaseUrl" class="block font-bold text-slate-700 mb-1">Supabase Project URL</label>
+            <input type="url" id="cfgSupabaseUrl" required placeholder="https://abcdefghijk.supabase.co" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono-num text-xs focus:outline-none focus:ring-2 focus:ring-rose-500" />
+          </div>
+          <div>
+            <label for="cfgSupabaseAnonKey" class="block font-bold text-slate-700 mb-1">Supabase Public Anon Key (Tuyệt đối KHÔNG dùng service_role)</label>
+            <input type="password" id="cfgSupabaseAnonKey" required autocomplete="off" placeholder="eyJhbGciOi... (chỉ dùng anon public key)" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono-num text-xs focus:outline-none focus:ring-2 focus:ring-rose-500" />
+          </div>
+          <button type="submit" class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold transition">
+            Kết nối tới Supabase Cloud
+          </button>
+        </form>
+      </div>
+
+      <!-- Tài khoản bị khóa / chưa kích hoạt -->
+      <div id="lockedBox" class="hidden p-6 space-y-4">
+        <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1.5">
+          <div class="font-extrabold text-sm text-amber-800">Tài khoản đang bị khóa hoặc chưa kích hoạt</div>
+          <p>Email <strong id="lockedEmail">--</strong> hiện không có quyền truy cập hệ thống.</p>
+        </div>
+        <button type="button" id="btnLockedOut" class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold">Đăng xuất</button>
+      </div>
+
+      <!-- Chặn 403 đối với HQ / Regional -->
+      <div id="forbiddenBox" class="hidden p-6 space-y-4">
+        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1.5">
+          <div class="font-extrabold text-sm text-rose-700">403 Forbidden — Không có quyền vào Kho Bảo Mật</div>
+          <p>Tài khoản <strong id="forbiddenEmail">--</strong> mang vai trò <strong id="forbiddenRole" class="uppercase">--</strong>. Toàn bộ chức năng cấp tài khoản &amp; quản lý bí mật bị khóa cứng cho <strong>ADMIN</strong> ở cả giao diện lẫn PostgreSQL (<code>42501</code>).</p>
+        </div>
+        <button type="button" id="btnForbiddenOut" class="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold">Đăng xuất</button>
+      </div>
+
+      <!-- Lỗi hồ sơ -->
+      <div id="errorBox" class="hidden p-6 space-y-4">
+        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs">
+          <div class="font-extrabold text-sm mb-1">Lỗi kiểm tra xác thực</div>
+          <p id="errorMessageText">--</p>
+        </div>
+        <button type="button" id="btnErrorOut" class="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold">Đăng xuất</button>
+      </div>
+
+      <!-- Form Đăng Nhập duy nhất -->
+      <div id="loginFormWrap" class="p-6 space-y-4">
+        <form id="loginForm" class="space-y-4">
+          <div>
+            <label for="loginEmail" class="block text-xs font-bold text-slate-700 mb-1">Email Quản Trị Viên</label>
+            <input type="email" id="loginEmail" required autocomplete="username" placeholder="admin@jtexpress.vn" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
+          </div>
+          <div>
+            <label for="loginPassword" class="block text-xs font-bold text-slate-700 mb-1">Mật khẩu (tối thiểu 12 ký tự)</label>
+            <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••••••" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
+          </div>
+          <p class="text-[11px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            Hệ thống đã tắt hoàn toàn tự đăng ký công khai. Mọi tài khoản Khu vực, HQ và Admin đều do Quản trị viên cấp trực tiếp.
+          </p>
+          <button type="submit" class="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-extrabold transition">
+            Đăng nhập vào Kho Bảo Mật
+          </button>
+        </form>
+        <div id="runtimeConfigBanner" class="hidden pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <span>Đang dùng cấu hình Cloud cục bộ trình duyệt</span>
+          <button type="button" id="btnResetRuntimeConfig" class="text-rose-600 hover:text-rose-700 font-bold underline">Đổi kết nối</button>
+        </div>
+      </div>
+
+      <!-- Ép đổi mật khẩu lần đầu -->
+      <div id="forcePassBox" class="hidden p-6 space-y-4">
+        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+          <strong>Bắt buộc đổi mật khẩu lần đầu:</strong> Tối thiểu 12 ký tự gồm chữ hoa, chữ thường, số và ký tự đặc biệt.
+        </div>
+        <form id="forcePassForm" class="space-y-3">
+          <input type="password" id="newStrongPass" required minlength="12" autocomplete="new-password" placeholder="Mật khẩu mới (≥ 12 ký tự mạnh)" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
+          <input type="password" id="confirmStrongPass" required minlength="12" autocomplete="new-password" placeholder="Nhập lại mật khẩu mới" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm" />
+          <div class="flex gap-2">
+            <button type="submit" class="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold">Lưu mật khẩu mới</button>
+            <button type="button" id="btnForcePassOut" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">Thoát</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Xác thực 2 lớp MFA (TOTP -> AAL2) -->
+      <div id="mfaBox" class="hidden p-6 space-y-4">
+        <div id="mfaTitle" class="text-xs font-extrabold text-slate-800 uppercase">Xác Thực 2 Lớp (MFA - AAL2)</div>
+        <div id="mfaQrWrap" class="hidden flex flex-col items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <img id="mfaQrImg" alt="QR MFA" class="w-44 h-44 rounded-lg border border-slate-200 bg-white p-1" />
+          <p class="text-[11px] text-slate-600 text-center">Quét mã QR bằng <strong>Google Authenticator</strong> hoặc <strong>Authy</strong>, sau đó nhập mã 6 số.</p>
+          <div class="text-[10px] font-mono-num text-slate-500 break-all">Mã thủ công: <strong id="mfaManualSecret">--</strong></div>
+        </div>
+        <form id="mfaVerifyForm" class="space-y-3">
+          <input type="text" id="mfaCodeInput" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" placeholder="Nhập mã OTP 6 số" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-center text-lg font-mono-num tracking-[0.4em]" />
+          <div class="flex gap-2">
+            <button type="submit" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold">Xác nhận OTP (AAL2)</button>
+            <button type="button" id="btnMfaSignOut" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">Thoát</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================================== -->
+  <!-- GIAO DIỆN QUẢN TRỊ KHO BẢO MẬT (4 TAB TÁCH BIỆT)                       -->
+  <!-- ====================================================================== -->
+  <div id="vaultShell" class="hidden flex-1 flex flex-col">
+    <header class="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-extrabold text-base">🛡️</div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-sm sm:text-base font-extrabold">Kho Bảo Mật Tài Khoản &amp; Bí Mật Tập Trung</h1>
+              <span class="px-2 py-0.5 rounded bg-emerald-500 text-slate-950 text-[10px] font-extrabold uppercase">ADMIN · AAL2</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Supabase Vault · Write-Only · Tách biệt hoàn toàn khỏi Dashboard vận hành</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <div class="text-right hidden sm:block">
+            <div id="adminNameLabel" class="text-xs font-bold">--</div>
+            <div id="adminEmailLabel" class="text-[10px] text-slate-400 font-mono-num">--</div>
+          </div>
+          <button type="button" id="btnSignOut" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white">Đăng xuất</button>
+        </div>
+      </div>
+
+      <nav class="bg-slate-900 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-2 overflow-x-auto">
+          <button type="button" data-tab="users" class="vault-tab active px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-300 border border-transparent hover:bg-slate-800 whitespace-nowrap">👥 1. Tài Khoản &amp; Phân Quyền</button>
+          <button type="button" data-tab="tokens" class="vault-tab px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-300 border border-transparent hover:bg-slate-800 whitespace-nowrap">🔑 2. Kho Token (JMS · Feishu)</button>
+          <button type="button" data-tab="creds" class="vault-tab px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-300 border border-transparent hover:bg-slate-800 whitespace-nowrap">🔐 3. Tài Khoản / MK JMS</button>
+          <button type="button" data-tab="audit" class="vault-tab px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-300 border border-transparent hover:bg-slate-800 whitespace-nowrap">📜 4. Nhật Ký Bảo Mật</button>
+          <button type="button" id="btnRefreshCurrentTab" class="ml-auto px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-cyan-300 whitespace-nowrap">↻ Làm mới</button>
+        </div>
+      </nav>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 space-y-6">
+
+      <!-- TAB 1: CẤP TÀI KHOẢN & DUYỆT QUYỀN -->
+      <section id="panel-users" class="space-y-5">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div>
+              <h2 class="text-sm font-extrabold text-slate-900">➕ Cấp Tài Khoản Nội Bộ Mới (Regional · HQ · Admin)</h2>
+              <p class="text-xs text-slate-500">Gọi Edge Function <code>admin-create-user</code>. Tài khoản mới bị ép đổi mật khẩu ngay lần đăng nhập đầu tiên.</p>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-mono-num">
+              <span class="px-2.5 py-1 rounded-lg bg-slate-100 font-bold">Tổng: <strong id="statTotalUsers">0</strong></span>
+              <span class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold">Đang khóa: <strong id="statPendingUsers">0</strong></span>
+            </div>
+          </div>
+
+          <form id="adminCreateUserForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs">
+            <div>
+              <label for="cuFullName" class="block font-bold text-slate-700 mb-1">Họ và tên nhân sự</label>
+              <input type="text" id="cuFullName" required placeholder="Nguyễn Văn A" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label for="cuEmail" class="block font-bold text-slate-700 mb-1">Email đăng nhập</label>
+              <input type="email" id="cuEmail" required placeholder="hcm.ops@jtexpress.vn" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono-num" />
+            </div>
+            <div>
+              <label for="cuRole" class="block font-bold text-slate-700 mb-1">Vai trò</label>
+              <select id="cuRole" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white">
+                <option value="regional">Regional (Chỉ xem 1 khu vực được gán)</option>
+                <option value="hq">HQ (Xem toàn quốc 7 KV · Bắt buộc MFA)</option>
+                <option value="admin">Admin (Toàn quyền Kho Bảo Mật · Bắt buộc MFA)</option>
+              </select>
+            </div>
+            <div id="cuRegionWrap">
+              <label for="cuRegion" class="block font-bold text-slate-700 mb-1">Khu vực gán (7 KV)</label>
+              <select id="cuRegion" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"></select>
+            </div>
+            <div>
+              <label for="cuTempPass" class="block font-bold text-slate-700 mb-1">Mật khẩu tạm (≥ 12 ký tự mạnh)</label>
+              <div class="flex gap-1.5">
+                <input type="text" id="cuTempPass" required minlength="12" autocomplete="off" class="flex-1 px-3 py-2 rounded-xl border border-slate-300 font-mono-num" />
+                <button type="button" id="btnGenStrongPass" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold whitespace-nowrap">Tạo MK</button>
+              </div>
+            </div>
+            <div>
+              <label for="cuNote" class="block font-bold text-slate-700 mb-1">Ghi chú</label>
+              <input type="text" id="cuNote" placeholder="VD: Điều phối cụm HCM 028GW0" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div class="md:col-span-2 lg:col-span-3 flex justify-end">
+              <button type="submit" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold shadow-sm">🛡️ Tạo Tài Khoản Ngay</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-900 text-white uppercase text-[10px]">
+                <tr>
+                  <th class="py-3 px-3.5">Nhân Sự / Email</th>
+                  <th class="py-3 px-3.5">Trạng Thái Bảo Mật</th>
+                  <th class="py-3 px-3.5">Vai Trò</th>
+                  <th class="py-3 px-3.5">Khu Vực (Regional)</th>
+                  <th class="py-3 px-3.5">Quyền Hiện Tại</th>
+                  <th class="py-3 px-3.5 text-right">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: KHO TOKEN TẬP TRUNG (JMS AUTH & FEISHU VIEW-ONLY) -->
+      <section id="panel-tokens" class="hidden space-y-5">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div>
+              <h2 class="text-sm font-extrabold text-slate-900">🔑 Lưu / Xoay Vòng Token (Supabase Vault · Write-Only)</h2>
+              <p class="text-xs text-slate-500">Gemini API Key lưu riêng tại Edge Function Secrets. Bảng này chỉ quản lý JMS authToken và Feishu OAuth Chỉ-Xem.</p>
+            </div>
+            <span id="statTokenCount" class="text-xs font-mono-num font-bold text-slate-500">0 token</span>
+          </div>
+
+          <form id="tokenForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 text-xs">
+            <div>
+              <label for="tkType" class="block font-bold text-slate-700 mb-1">Loại Token</label>
+              <select id="tkType" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white">
+                <option value="jms_auth">JMS authToken (Chính / Dự phòng)</option>
+                <option value="feishu_oauth">Feishu OAuth (Chế độ Chỉ Xem)</option>
+              </select>
+            </div>
+            <div>
+              <label for="tkName" class="block font-bold text-slate-700 mb-1">Tên Định Danh (Trùng tên = Xoay vòng)</label>
+              <input type="text" id="tkName" required placeholder="VD: JMS_HCM_PRIMARY" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono-num uppercase" />
+            </div>
+            <div>
+              <label for="tkRegion" class="block font-bold text-slate-700 mb-1">Phạm Vi Khu Vực</label>
+              <select id="tkRegion" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"></select>
+            </div>
+            <div>
+              <label for="tkPriority" class="block font-bold text-slate-700 mb-1">Ưu Tiên (1 = Chính, 2 = Dự phòng)</label>
+              <input type="number" id="tkPriority" min="1" max="99" value="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono-num" />
+            </div>
+            <div class="md:col-span-2">
+              <label for="tkPlainVal" class="block font-bold text-slate-700 mb-1">Giá Trị Token (Xóa khỏi ô ngay sau khi lưu)</label>
+              <input type="password" id="tkPlainVal" required autocomplete="off" placeholder="Dán authToken JMS hoặc user_access_token Feishu..." class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono-num" />
+            </div>
+            <div class="md:col-span-2">
+              <label for="tkNote" class="block font-bold text-slate-700 mb-1">Ghi chú</label>
+              <input type="text" id="tkNote" placeholder="VD: Cụm HCM 028GW0/GW5/GW6" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+
+            <div id="feishuExtraFields" class="hidden md:col-span-2 lg:col-span-4 grid grid-cols-1 md:grid-cols-3 gap-3.5 p-3.5 rounded-xl bg-sky-50 border border-sky-200">
+              <div>
+                <label for="tkRefreshAction" class="block font-bold text-sky-900 mb-1">Hành động với Refresh Token</label>
+                <select id="tkRefreshAction" class="w-full px-3 py-2 rounded-xl border border-sky-300 bg-white font-bold">
+                  <option value="keep">Giữ nguyên Refresh Token cũ (keep)</option>
+                  <option value="replace">Thay bằng Refresh Token mới (replace)</option>
+                  <option value="clear">Xóa sạch Refresh Token cũ (clear)</option>
+                </select>
+              </div>
+              <div>
+                <label for="tkRefreshVal" class="block font-bold text-sky-900 mb-1">Feishu Refresh Token mới</label>
+                <input type="password" id="tkRefreshVal" autocomplete="off" placeholder="Chỉ nhập khi chọn replace..." class="w-full px-3 py-2 rounded-xl border border-sky-300 bg-white font-mono-num disabled:bg-slate-100" />
+              </div>
+              <div>
+                <label for="tkExpiresAt" class="block font-bold text-sky-900 mb-1">Hạn dùng (expires_at)</label>
+                <input type="datetime-local" id="tkExpiresAt" class="w-full px-3 py-2 rounded-xl border border-sky-300 bg-white font-mono-num" />
+              </div>
+            </div>
+
+            <div class="md:col-span-2 lg:col-span-4 flex justify-end gap-2">
+              <button type="reset" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Xóa form</button>
+              <button type="submit" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold shadow-sm">🔒 Lưu Vào Supabase Vault</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-900 text-white uppercase text-[10px]">
+                <tr>
+                  <th class="py-3 px-3">Tên Token</th>
+                  <th class="py-3 px-3">Loại</th>
+                  <th class="py-3 px-3">Vùng / Ưu Tiên</th>
+                  <th class="py-3 px-3">Chuỗi Che (Write-Only)</th>
+                  <th class="py-3 px-3">Hạn / Cập Nhật</th>
+                  <th class="py-3 px-3">Trạng Thái &amp; Lỗi</th>
+                  <th class="py-3 px-3 text-right">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="tokensTableBody" class="divide-y divide-slate-100 font-mono-num"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: TÀI KHOẢN / MẬT KHẨU ĐĂNG NHẬP JMS -->
+      <section id="panel-creds" class="hidden space-y-5">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div>
+              <h2 class="text-sm font-extrabold text-slate-900">🔐 Kho Tài Khoản &amp; Mật Khẩu Đăng Nhập JMS (Write-Only)</h2>
+              <p class="text-xs text-slate-500">Phục vụ Sync Worker Python tự đăng nhập cấp lại <code>authToken</code> khi hết hạn. Tuyệt đối không trả mật khẩu về trình duyệt.</p>
+            </div>
+            <span id="statCredCount" class="text-xs font-mono-num font-bold text-slate-500">0 tài khoản JMS</span>
+          </div>
+
+          <form id="jmsCredForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs">
+            <div>
+              <label for="credName" class="block font-bold text-slate-700 mb-1">Tên Định Danh Tài Khoản JMS</label>
+              <input type="text" id="credName" required placeholder="VD: JMS_LOGIN_HCM_01" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono-num uppercase" />
+            </div>
+            <div>
+              <label for="credRegion" class="block font-bold text-slate-700 mb-1">Phạm Vi Khu Vực</label>
+              <select id="credRegion" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"></select>
+            </div>
+            <div>
+              <label for="credPriority" class="block font-bold text-slate-700 mb-1">Độ Ưu Tiên</label>
+              <input type="number" id="credPriority" min="1" max="99" value="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono-num" />
+            </div>
+            <div>
+              <label for="credUsername" class="block font-bold text-slate-700 mb-1">Tài khoản đăng nhập JMS (Username)</label>
+              <input type="text" id="credUsername" required autocomplete="off" placeholder="Nhập username JMS..." class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono-num" />
+            </div>
+            <div>
+              <label for="credPassword" class="block font-bold text-slate-700 mb-1">Mật khẩu đăng nhập JMS (Password)</label>
+              <input type="password" id="credPassword" required autocomplete="off" placeholder="Nhập password JMS..." class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono-num" />
+            </div>
+            <div>
+              <label for="credNote" class="block font-bold text-slate-700 mb-1">Ghi chú</label>
+              <input type="text" id="credNote" placeholder="VD: Tài khoản chỉ đọc báo cáo TMS" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div class="md:col-span-2 lg:col-span-3 flex justify-end gap-2">
+              <button type="reset" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">Xóa form</button>
+              <button type="submit" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold shadow-sm">🔒 Mã Hóa &amp; Lưu Tài Khoản JMS</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-900 text-white uppercase text-[10px]">
+                <tr>
+                  <th class="py-3 px-3">Tên Định Danh</th>
+                  <th class="py-3 px-3">Vùng / Ưu Tiên</th>
+                  <th class="py-3 px-3">Tài Khoản (Che) &amp; Mật Khẩu</th>
+                  <th class="py-3 px-3">Cập Nhật / Login Cuối</th>
+                  <th class="py-3 px-3">Trạng Thái &amp; Lỗi</th>
+                  <th class="py-3 px-3 text-right">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="jmsCredsTableBody" class="divide-y divide-slate-100 font-mono-num"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: NHẬT KÝ BẢO MẬT -->
+      <section id="panel-audit" class="hidden space-y-4">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-sm font-extrabold text-slate-900">📜 Nhật Ký Bảo Mật Hệ Thống (Chỉ Đọc · Không Cho Xóa)</h2>
+            <p class="text-xs text-slate-500">Mọi thao tác cấp tài khoản, duyệt/thu hồi quyền, lưu/xoay/xóa bí mật đều được ghi vết không chứa plaintext.</p>
+          </div>
+          <select id="auditActionFilter" class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white">
+            <option value="ALL">Tất cả hành động</option>
+            <option value="ADMIN_CREATED_USER">ADMIN_CREATED_USER</option>
+            <option value="PERMISSION_APPROVED">PERMISSION_APPROVED</option>
+            <option value="PERMISSION_REVOKED">PERMISSION_REVOKED</option>
+            <option value="TOKEN_SAVED">TOKEN_SAVED</option>
+            <option value="TOKEN_STATUS_CHANGED">TOKEN_STATUS_CHANGED</option>
+            <option value="TOKEN_DELETED">TOKEN_DELETED</option>
+            <option value="JMS_CREDENTIAL_SAVED">JMS_CREDENTIAL_SAVED</option>
+            <option value="JMS_CREDENTIAL_STATUS_CHANGED">JMS_CREDENTIAL_STATUS_CHANGED</option>
+            <option value="JMS_CREDENTIAL_DELETED">JMS_CREDENTIAL_DELETED</option>
+            <option value="FIRST_PASSWORD_CHANGED">FIRST_PASSWORD_CHANGED</option>
+            <option value="BOOTSTRAP_ADMIN_GRANTED">BOOTSTRAP_ADMIN_GRANTED</option>
+          </select>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-900 text-white uppercase text-[10px]">
+                <tr>
+                  <th class="py-3 px-3">Thời Gian</th>
+                  <th class="py-3 px-3">Người Thực Hiện</th>
+                  <th class="py-3 px-3">Hành Động</th>
+                  <th class="py-3 px-3">Đối Tượng</th>
+                  <th class="py-3 px-3">Chi Tiết Metadata</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody" class="divide-y divide-slate-100 font-mono-num"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./js/vault-app.js"></script>
+</body>
+</html>

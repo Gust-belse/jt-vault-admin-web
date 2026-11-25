@@ -1,0 +1,1 @@
+# Không yêu cầu thư viện Python bên thứ ba (chạy thuần Python 3.10+ stdlib + Docker Compose + Node.js).

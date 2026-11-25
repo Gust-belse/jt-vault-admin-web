@@ -1,0 +1,24 @@
+# Environment & Secrets (NEVER commit real secrets)
+.env
+.env.local
+.env.*.local
+04-cloud-deploy/.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Supabase local temp
+supabase/.temp/
+supabase/.branches/
+
+# Sandbox logs
+05-sandbox-pipeline/*.log

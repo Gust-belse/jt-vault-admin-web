@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>J&amp;T Express KPI-DPGS — Cổng Kho Bảo Mật &amp; Cloud Backend</title>
+  <meta name="description" content="Hệ thống Kho Bảo Mật Tài Khoản &amp; Bí Mật Tập Trung (Supabase Vault · Write-Only · Admin MFA AAL2) triển khai trên GitHub Pages và Supabase Cloud." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-muted: #f1f4f8;
+      --ink: #0f172a;
+      --ink-secondary: #475569;
+      --ink-muted: #64748b;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --brand: #d91c34;
+      --brand-hover: #b8152a;
+      --brand-soft: #fff1f2;
+      --ok-bg: #ecfdf5;
+      --ok-ink: #065f46;
+      --warn-bg: #fffbeb;
+      --warn-ink: #92400e;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 10px 30px -12px rgba(15, 23, 42, 0.14);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    code, pre, .mono {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .container {
+      width: 100%;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Top bar */
+    .topbar {
+      background: #0b1120;
+      color: #f8fafc;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .topbar-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 64px;
+      padding: 12px 0;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--brand);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: -0.02em;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .topbar-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-link {
+      font-size: 13px;
+      font-weight: 600;
+      color: #cbd5e1;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      transition: background 150ms ease, color 150ms ease;
+    }
+
+    .nav-link:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: transform 120ms ease, background 150ms ease, box-shadow 150ms ease;
+    }
+
+    .btn:active { transform: translateY(1px); }
+
+    .btn-primary {
+      background: var(--brand);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(217, 28, 52, 0.25);
+    }
+
+    .btn-primary:hover {
+      background: var(--brand-hover);
+      box-shadow: 0 6px 16px rgba(217, 28, 52, 0.32);
+    }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--ink);
+      border-color: var(--border-strong);
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface-muted);
+    }
+
+    /* Hero */
+    .hero {
+      padding: 44px 0 28px;
+    }
+
+    .hero-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      box-shadow: var(--shadow-md);
+      display: grid;
+      grid-template-columns: 1.35fr 0.95fr;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .hero h1 {
+      margin: 0 0 12px;
+      font-size: clamp(24px, 3.2vw, 34px);
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .hero p {
+      margin: 0 0 22px;
+      color: var(--ink-secondary);
+      font-size: 15px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .status-panel {
+      background: var(--surface-muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+
+    .status-label {
+      color: var(--ink-muted);
+      font-weight: 600;
+    }
+
+    .status-value {
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+
+    .badge-ok { background: var(--ok-bg); color: var(--ok-ink); }
+    .badge-warn { background: var(--warn-bg); color: var(--warn-ink); }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      border: 0;
+      margin: 0;
+    }
+
+    /* Sections */
+    .section {
+      padding: 20px 0 32px;
+    }
+
+    .section-head {
+      margin-bottom: 18px;
+    }
+
+    .section-head h2 {
+      margin: 0 0 4px;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.015em;
+    }
+
+    .section-head p {
+      margin: 0;
+      font-size: 13.5px;
+      color: var(--ink-secondary);
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .step-num {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--brand);
+      margin-bottom: 6px;
+    }
+
+    .feature-card h3 {
+      margin: 0 0 6px;
+      font-size: 14.5px;
+      font-weight: 700;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--ink-secondary);
+    }
+
+    /* Setup guide */
+    .steps-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .step-card h3 {
+      margin: 0;
+      font-size: 14.5px;
+      font-weight: 700;
+    }
+
+    .step-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--ink-secondary);
+    }
+
+    .code-block {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 12px;
+      overflow-x: auto;
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    .copy-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-copy {
+      background: var(--surface-muted);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      border-radius: 7px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-copy:hover { background: var(--border); }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 0 36px;
+      margin-top: 20px;
+      font-size: 12.5px;
+      color: var(--ink-muted);
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 900px) {
+      .hero-card { grid-template-columns: 1fr; padding: 24px; }
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .steps-list { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      .grid-4 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <div class="brand">
+        <div class="brand-mark">J&amp;T</div>
+        <div>
+          <div class="brand-title">KPI-DPGS · Kho Bảo Mật Tập Trung</div>
+          <div class="brand-sub">GitHub Pages Frontend · Supabase Cloud Vault Backend</div>
+        </div>
+      </div>
+      <nav class="topbar-nav" aria-label="Điều hướng chính">
+        <a class="nav-link" href="#architecture">Kiến trúc 4 lớp</a>
+        <a class="nav-link" href="#cloud-setup">Cấu hình Cloud</a>
+        <a class="btn btn-primary" href="./02-vault-admin-ui/vault.html">Mở Kho Bảo Mật (Admin) →</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="hero-card">
+        <div>
+          <h1>Kho Bảo Mật Tài Khoản &amp; Bí Mật Tập Trung</h1>
+          <p>
+            Cổng quản trị tách biệt hoàn toàn khỏi Dashboard vận hành cho hệ thống <strong>J&amp;T Express KPI-DPGS</strong>.
+            Quản lý cấp tài khoản nội bộ 7 khu vực, xoay vòng <code>JMS authToken</code>, <code>Feishu OAuth</code> và
+            tài khoản đăng nhập JMS bằng mã hóa <strong>Supabase Vault (Write-Only)</strong>.
+          </p>
+          <div class="hero-actions">
+            <a id="btnOpenVault" class="btn btn-primary" href="./02-vault-admin-ui/vault.html">
+              Truy cập Kho Bảo Mật Admin (AAL2)
+            </a>
+            <a class="btn btn-secondary" href="https://github.com/Gust-belse/jt-vault-admin-web" target="_blank" rel="noopener noreferrer">
+              Xem mã nguồn trên GitHub
+            </a>
+          </div>
+        </div>
+
+        <aside class="status-panel" aria-label="Trạng thái kết nối Cloud">
+          <div class="status-row">
+            <span class="status-label">Trạng thái Supabase Cloud</span>
+            <span id="cloudStatusBadge" class="badge badge-warn">Đang kiểm tra...</span>
+          </div>
+          <hr class="divider" />
+          <div class="status-row">
+            <span class="status-label">Endpoint kết nối</span>
+            <span id="cloudEndpointText" class="status-value mono" style="font-size: 12px;">Chưa cấu hình</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">Chế độ bảo vệ</span>
+            <span class="status-value">Admin · MFA TOTP (AAL2)</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">Phạm vi vận hành</span>
+            <span class="status-value">7 Khu Vực (VN) · Write-Only</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">Đường dẫn Quản trị</span>
+            <span class="status-value mono" style="font-size: 12px;">02-vault-admin-ui/vault.html</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="architecture" class="section">
+      <div class="section-head">
+        <h2>Kiến trúc bảo mật 4 tầng (Frontend + PostgreSQL Cloud)</h2>
+        <p>Toàn bộ quy tắc phân quyền và mã hóa được cưỡng chế trực tiếp tại PostgreSQL &amp; Edge Function, không phụ thuộc giao diện.</p>
+      </div>
+      <div class="grid-4">
+        <article class="feature-card">
+          <div class="step-num">Tầng 01 · Tài khoản</div>
+          <h3>Tắt đăng ký công khai</h3>
+          <p>Chỉ Admin AAL2 được cấp tài khoản qua Edge Function <code>admin-create-user</code>. Ép đổi mật khẩu mạnh &ge; 12 ký tự ngay lần đầu.</p>
+        </article>
+        <article class="feature-card">
+          <div class="step-num">Tầng 02 · Xác thực</div>
+          <h3>Bắt buộc MFA (AAL2)</h3>
+          <p>Mọi hàm RPC quản trị kiểm tra <code>auth.jwt() -&gt;&gt; 'aal' = 'aal2'</code>. Tài khoản HQ/Regional hoặc chưa xác thực OTP bị chặn <code>42501</code>.</p>
+        </article>
+        <article class="feature-card">
+          <div class="step-num">Tầng 03 · Bí mật</div>
+          <h3>Supabase Vault Write-Only</h3>
+          <p>Token JMS, Feishu OAuth và mật khẩu JMS mã hóa trong <code>vault.secrets</code>. Trình duyệt chỉ nhận chuỗi che, không bao giờ nhận plaintext.</p>
+        </article>
+        <article class="feature-card">
+          <div class="step-num">Tầng 04 · Truy vết</div>
+          <h3>Nhật ký bất biến</h3>
+          <p>Bảng <code>security_audit_logs</code> gắn trigger chặn tuyệt đối <code>UPDATE/DELETE</code>, ghi vết đầy đủ thao tác không chứa bí mật gốc.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="cloud-setup" class="section">
+      <div class="section-head">
+        <h2>Triển khai dữ liệu lên Supabase Cloud trong 4 bước</h2>
+        <p>Tất cả SQL Schema, RLS, Supabase Vault RPC và Edge Function đã được đóng gói sẵn trong repository này.</p>
+      </div>
+      <div class="steps-list">
+        <article class="step-card">
+          <div class="step-num">Bước 1 · Khởi tạo Cloud Database</div>
+          <h3>Chạy SQL Migration trên Supabase Cloud</h3>
+          <p>Tạo project miễn phí tại <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">supabase.com</a>, mở <strong>SQL Editor</strong> và chạy tệp <code>01-supabase-db/full_deploy_supabase_sql_editor.sql</code> (hoặc đẩy bằng Supabase CLI).</p>
+          <pre class="code-block">bash 04-cloud-deploy/deploy-supabase.sh &lt;PROJECT_REF&gt;</pre>
+        </article>
+
+        <article class="step-card">
+          <div class="step-num">Bước 2 · Cấp Super Admin đầu tiên</div>
+          <h3>Tạo tài khoản Auth &amp; chạy hàm Bootstrap</h3>
+          <p>Trong <strong>Authentication &rarr; Providers &rarr; Email</strong> hãy tắt <em>Allow new users to sign up</em>, tạo user Admin trong mục <strong>Users</strong>, sau đó chạy lệnh sau tại SQL Editor:</p>
+          <div class="copy-row">
+            <span class="mono" style="font-size: 11px; color: var(--ink-muted);">01-supabase-db/004_bootstrap_first_admin.sql</span>
+            <button type="button" class="btn-copy" data-copy="SELECT private.bootstrap_first_admin('admin@jtexpress.vn', 'Quản Trị Viên Hệ Thống', false);">Sao chép SQL</button>
+          </div>
+          <pre class="code-block">SELECT private.bootstrap_first_admin(
+  'admin@jtexpress.vn', 'Quản Trị Viên Hệ Thống', false
+);</pre>
+        </article>
+
+        <article class="step-card">
+          <div class="step-num">Bước 3 · Kết nối Website GitHub Pages</div>
+          <h3>Điền Public URL &amp; Public Anon Key</h3>
+          <p>Vào <strong>Project Settings &rarr; API</strong> để lấy <code>Project URL</code> và <code>anon public</code> key, điền vào <code>02-vault-admin-ui/js/config.js</code> hoặc nhập trực tiếp trên màn hình kết nối nhanh của Kho Bảo Mật.</p>
+          <pre class="code-block">export const SUPABASE_CONFIG = Object.freeze({
+  url: 'https://YOUR_PROJECT_REF.supabase.co',
+  anonKey: 'YOUR_SUPABASE_ANON_KEY'
+});</pre>
+        </article>
+
+        <article class="step-card">
+          <div class="step-num">Bước 4 · Kiểm thử Sandbox tự động</div>
+          <h3>Xác minh bảo mật 4 tầng bằng Docker + Python</h3>
+          <p>Chạy bộ kiểm thử tích hợp trong <code>05-sandbox-pipeline/</code> để kiểm tra RLS, chặn <code>42501</code>, mã hóa Vault và tính bất biến của Audit Log trước khi đưa vào vận hành:</p>
+          <div class="copy-row">
+            <span class="mono" style="font-size: 11px; color: var(--ink-muted);">05-sandbox-pipeline</span>
+            <button type="button" class="btn-copy" data-copy="docker compose -f 05-sandbox-pipeline/docker-compose.test.yml up -d && python3 05-sandbox-pipeline/run_executor_and_integration.py --stage all">Sao chép lệnh</button>
+          </div>
+          <pre class="code-block">docker compose -f 05-sandbox-pipeline/docker-compose.test.yml up -d
+python3 05-sandbox-pipeline/run_executor_and_integration.py --stage all</pre>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <span>J&amp;T Express · KPI-DPGS Vault Admin Portal</span>
+      <span class="mono">GitHub Pages + Supabase Cloud (Auth MFA AAL2 · Vault · Edge Functions)</span>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { getActiveSupabaseConfig } from './02-vault-admin-ui/js/config.js';
+
+    const badge = document.getElementById('cloudStatusBadge');
+    const endpointEl = document.getElementById('cloudEndpointText');
+    const cfg = getActiveSupabaseConfig();
+
+    if (cfg) {
+      badge.textContent = cfg.source === 'static' ? 'Đã kết nối (config.js)' : 'Đã kết nối (Trình duyệt)';
+      badge.className = 'badge badge-ok';
+      try {
+        endpointEl.textContent = new URL(cfg.url).host;
+      } catch {
+        endpointEl.textContent = cfg.url;
+      }
+    } else {
+      badge.textContent = 'Chờ cấu hình URL / Anon Key';
+      badge.className = 'badge badge-warn';
+      endpointEl.textContent = 'Nhập trực tiếp tại Kho Bảo Mật';
+    }
+
+    document.querySelectorAll('.btn-copy').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const text = btn.dataset.copy || '';
+        try {
+          await navigator.clipboard.writeText(text);
+          const old = btn.textContent;
+          btn.textContent = 'Đã sao chép';
+          setTimeout(() => { btn.textContent = old; }, 1600);
+        } catch {
+          btn.textContent = 'Không thể sao chép';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
